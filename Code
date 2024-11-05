@@ -1,0 +1,145 @@
+import tkinter as tk
+from tkinter import messagebox, simpledialog, ttk
+import sqlite3
+
+class CriminalRecordManagement:
+    def _init_(self, root):
+        self.root = root
+        self.root.title("Criminal Record Management System")
+        self.root.configure(bg='skyblue')
+
+        # Database connection
+        self.conn = sqlite3.connect("criminal_records.db")  # Create/connect to the SQLite database
+        self.cursor = self.conn.cursor()
+
+        # Create table if not exists
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS records (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                name TEXT NOT NULL,
+                                age INTEGER NOT NULL,
+                                gender TEXT NOT NULL,
+                                crime TEXT NOT NULL,
+                                year TEXT NOT NULL,
+                                description TEXT NOT NULL)''')
+        self.conn.commit()
+
+        # UI elements...
+        self.records = []
+        self.is_authenticated = False
+
+        self.label = tk.Label(root, text="Criminal Record Management", font=("Times New Roman", 18), bg='white')
+        self.label.pack(pady=10)
+
+        self.tree = ttk.Treeview(root, columns=("Name", "Age", "Gender", "Crime", "Year", "Description"), show='headings')
+        self.tree.heading("Name", text="Name")
+        self.tree.heading("Age", text="Age")
+        self.tree.heading("Gender", text="Gender")
+        self.tree.heading("Crime", text="Crime")
+        self.tree.heading("Year", text="Year")
+        self.tree.heading("Description", text="Description")
+        self.tree.pack(pady=10)
+
+        self.add_button = tk.Button(root, text="Add Record", command=self.add_record, font=("Times New Roman", 12), bg='white')
+        self.add_button.pack(pady=5)
+
+        self.view_button = tk.Button(root, text="View Records", command=self.view_records, font=("Times New Roman", 12), bg='white')
+        self.view_button.pack(pady=5)
+
+        self.delete_button = tk.Button(root, text="Delete Record", command=self.delete_record, font=("Times New Roman", 12), bg='white')
+        self.delete_button.pack(pady=5)
+
+        self.search_button = tk.Button(root, text="Search Record", command=self.search_record, font=("Times New Roman", 12), bg='white')
+        self.search_button.pack(pady=5)
+
+        self.logout_button = tk.Button(root, text="Logout", command=self.logout, font=("Times New Roman", 12), bg='white')
+        self.logout_button.pack(pady=5)
+
+    def authenticate(self):
+        username = simpledialog.askstring("Username", "Enter your username:")
+        password = simpledialog.askstring("Password", "Enter your password:", show='*')
+
+        if username == "jaspreet" and password == "tanisha":
+            self.is_authenticated = True
+            messagebox.showinfo("Success", "Login successful!")
+        else:
+            messagebox.showerror("Error", "Invalid username or password.")
+
+    def add_record(self):
+        if not self.is_authenticated:
+            messagebox.showwarning("Warning", "Please login first.")
+            self.authenticate()
+            return
+
+        name = simpledialog.askstring("Input", "Enter Criminal Name:")
+        if name:
+            age = simpledialog.askinteger("Input", "Enter Age:")
+            gender = simpledialog.askstring("Input", "Enter Gender:")
+            crime = simpledialog.askstring("Input", "Enter Crime:")
+            year = simpledialog.askstring("Input", "Enter Year of Crime:")
+            description = simpledialog.askstring("Input", "Enter Crime Description:")
+
+            self.cursor.execute('''INSERT INTO records (name, age, gender, crime, year, description)
+                                   VALUES (?, ?, ?, ?, ?, ?)''',
+                                (name, age, gender, crime, year, description))
+            self.conn.commit()
+            self.view_records()  # Refresh the view after adding
+            messagebox.showinfo("Success", "Record Added Successfully")
+
+    def view_records(self):
+        if not self.is_authenticated:
+            messagebox.showwarning("Warning", "Please login first.")
+            self.authenticate()
+            return
+
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        self.cursor.execute('''SELECT name, age, gender, crime, year, description FROM records''')
+        records = self.cursor.fetchall()
+
+        for record in records:
+            self.tree.insert("", tk.END, values=record)
+
+    def delete_record(self):
+        if not self.is_authenticated:
+            messagebox.showwarning("Warning", "Please login first.")
+            self.authenticate()
+            return
+
+        name = simpledialog.askstring("Input", "Enter Criminal Name to Delete:")
+        if name:
+            self.cursor.execute('''DELETE FROM records WHERE name = ?''', (name,))
+            self.conn.commit()
+            self.view_records()
+            messagebox.showinfo("Success", "Record Deleted Successfully")
+
+    def search_record(self):
+        if not self.is_authenticated:
+            messagebox.showwarning("Warning", "Please login first.")
+            self.authenticate()
+            return
+
+        name = simpledialog.askstring("Input", "Enter Criminal Name to Search:")
+        if name:
+            self.cursor.execute('''SELECT * FROM records WHERE name = ?''', (name,))
+            record = self.cursor.fetchone()
+
+            if record:
+                messagebox.showinfo("Record Found",
+                    f"Name: {record[1]}\nAge: {record[2]}\nGender: {record[3]}\n"
+                    f"Crime: {record[4]}\nYear: {record[5]}\nDescription: {record[6]}"
+                )
+            else:
+                messagebox.showwarning("Warning", "Record not found.")
+
+    def logout(self):
+        self.is_authenticated = False
+        self.tree.delete(*self.tree.get_children())  # Clear the table on logout
+        messagebox.showinfo("Logout", "You have been logged out.")
+        self.conn.close()
+
+if _name_ == "_main_":
+    root = tk.Tk()
+    app = CriminalRecordManagement(root)
+    app.authenticate()  # Prompt for authentication at startup
+    root.mainloop()
